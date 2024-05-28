@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "sea-battle"
+version = "0.1.0"
+description = ""
+authors = ["IlyaChuvilko <89748002+ChuvilkoDEV@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pygame = "^2.5.2"
+fastapi = "^0.111.0"
+uvicorn = "^0.30.0"
+requests = "^2.32.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
