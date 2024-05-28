@@ -11,6 +11,7 @@ pygame = "^2.5.2"
 fastapi = "^0.111.0"
 uvicorn = "^0.30.0"
 requests = "^2.32.2"
+redis = "^5.0.4"
 
 
 [build-system]

@@ -1,0 +1,12 @@
+battleship/
+│
+├── client/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── menu.py
+│   ├── game.py
+│   └── utils.py
+│
+└── server/
+    ├── __init__.py
+    └── server.py

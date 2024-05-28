@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Tuple, Dict
+from .database import add_session, get_sessions, remove_session
 
 app = FastAPI()
 
@@ -49,22 +50,30 @@ class Board(BaseModel):
 class Game(BaseModel):
     player_board: Board = Board()
     computer_board: Board = Board()
+    player_name: str = ""
 
 
 games: Dict[str, Game] = {}
 
 
+class CreateGameRequest(BaseModel):
+    game_id: str
+    player_name: str
+
+
 @app.post("/create_game/")
-def create_game(game_id: str):
-    if game_id in games:
+def create_game(request: CreateGameRequest):
+    if request.game_id in games:
         raise HTTPException(status_code=400, detail="Game with this ID already exists.")
-    games[game_id] = Game()
-    return {"message": "Game created successfully.", "game_id": game_id}
+    games[request.game_id] = Game(player_name=request.player_name)
+    add_session(request.game_id, request.player_name)
+    return {"message": "Game created successfully.", "game_id": request.game_id}
 
 
 @app.get("/get_games/")
 def get_games():
-    return {"games": list(games.keys())}
+    sessions = get_sessions()
+    return {"games": sessions}
 
 
 @app.post("/place_ship/")
@@ -86,4 +95,3 @@ def shoot(pos: Tuple[int, int], game_id: str, player: str):
     board = games[game_id].computer_board if player == "player" else games[game_id].player_board
     result = board.shoot(pos)
     return {"result": result}
-

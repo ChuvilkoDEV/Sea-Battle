@@ -1,3 +1,4 @@
+# main.py
 import pygame
 import sys
 from menu import main_menu, game_rooms_menu, settings_menu
