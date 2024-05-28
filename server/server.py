@@ -46,28 +46,26 @@ class Board(BaseModel):
         return "miss"
 
 
-player_board = Board()
-computer_board = Board()
+class Game(BaseModel):
+    player_board: Board = Board()
+    computer_board: Board = Board()
+
+
+game = Game()
 
 
 @app.post("/place_ship/")
-async def place_ship(ship: Ship, player: str):
-    board = player_board if player == "player" else computer_board
+def place_ship(ship: Ship, player: str):
+    board = game.player_board if player == "player" else game.computer_board
     if board.can_place(ship):
         board.place_ship(ship)
-        return {"status": "success"}
+        return {"message": "Ship placed successfully."}
     else:
-        raise HTTPException(status_code=400, detail="Cannot place ship")
+        raise HTTPException(status_code=400, detail="Cannot place ship here.")
 
 
 @app.post("/shoot/")
-async def shoot(pos: Tuple[int, int], player: str):
-    board = computer_board if player == "player" else player_board
+def shoot(pos: Tuple[int, int], player: str):
+    board = game.computer_board if player == "player" else game.player_board
     result = board.shoot(pos)
     return {"result": result}
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
