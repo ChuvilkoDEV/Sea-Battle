@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 app = FastAPI()
 
@@ -51,12 +51,27 @@ class Game(BaseModel):
     computer_board: Board = Board()
 
 
-game = Game()
+games: Dict[str, Game] = {}
+
+
+@app.post("/create_game/")
+def create_game(game_id: str):
+    if game_id in games:
+        raise HTTPException(status_code=400, detail="Game with this ID already exists.")
+    games[game_id] = Game()
+    return {"message": "Game created successfully.", "game_id": game_id}
+
+
+@app.get("/get_games/")
+def get_games():
+    return {"games": list(games.keys())}
 
 
 @app.post("/place_ship/")
-def place_ship(ship: Ship, player: str):
-    board = game.player_board if player == "player" else game.computer_board
+def place_ship(ship: Ship, game_id: str, player: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    board = games[game_id].player_board if player == "player" else games[game_id].computer_board
     if board.can_place(ship):
         board.place_ship(ship)
         return {"message": "Ship placed successfully."}
@@ -65,7 +80,10 @@ def place_ship(ship: Ship, player: str):
 
 
 @app.post("/shoot/")
-def shoot(pos: Tuple[int, int], player: str):
-    board = game.computer_board if player == "player" else game.player_board
+def shoot(pos: Tuple[int, int], game_id: str, player: str):
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    board = games[game_id].computer_board if player == "player" else games[game_id].player_board
     result = board.shoot(pos)
     return {"result": result}
+

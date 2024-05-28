@@ -17,19 +17,19 @@ GRAY = (169, 169, 169)
 SERVER_URL = "http://127.0.0.1:8000"
 
 
-def place_ship(size, orientation, start_pos, player):
+def place_ship(size, orientation, start_pos, game_id, player):
     ship = {
         "size": size,
         "orientation": orientation,
         "positions": [(start_pos[0] + i if orientation == 1 else start_pos[0],
                        start_pos[1] + i if orientation == 0 else start_pos[1]) for i in range(size)]
     }
-    response = requests.post(f"{SERVER_URL}/place_ship/", json={"ship": ship, "player": player})
+    response = requests.post(f"{SERVER_URL}/place_ship/", json={"ship": ship, "game_id": game_id, "player": player})
     return response.json()
 
 
-def shoot(pos, player):
-    response = requests.post(f"{SERVER_URL}/shoot/", json={"pos": pos, "player": player})
+def shoot(pos, game_id, player):
+    response = requests.post(f"{SERVER_URL}/shoot/", json={"pos": pos, "game_id": game_id, "player": player})
     return response.json()
 
 
@@ -48,7 +48,7 @@ def draw_grid(screen, offset_x=0):
                              (MARGIN + col * CELL_SIZE + offset_x, MARGIN + row * CELL_SIZE, CELL_SIZE, CELL_SIZE), 1)
 
 
-def game_loop(screen):
+def game_loop(screen, game_id):
     run = True
     clock = pygame.time.Clock()
     player_turn = True
@@ -69,7 +69,7 @@ def game_loop(screen):
                 if mouse_x > MARGIN + screen.get_width() // 2 + OFFSET and mouse_y > MARGIN and mouse_x < MARGIN + screen.get_width() // 2 + OFFSET + COLS * CELL_SIZE and mouse_y < MARGIN + ROWS * CELL_SIZE:
                     col = (mouse_x - MARGIN - screen.get_width() // 2 - OFFSET) // CELL_SIZE
                     row = (mouse_y - MARGIN) // CELL_SIZE
-                    result = shoot((row, col), "player")
+                    result = shoot((row, col), game_id, "player")
                     if result["result"] in ["hit", "sunk"]:
                         print(f"Player hit at {(row, col)}!")
                     elif result["result"] == "miss":
@@ -78,7 +78,7 @@ def game_loop(screen):
 
         if not player_turn:
             row, col = randint(0, ROWS - 1), randint(0, COLS - 1)
-            result = shoot((row, col), "computer")
+            result = shoot((row, col), game_id, "computer")
             if result["result"] in ["hit", "sunk"]:
                 print(f"Computer hit at {(row, col)}!")
             elif result["result"] == "miss":
