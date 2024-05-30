@@ -1,18 +1,31 @@
 # server/database.py
-import redis
+import sqlite3
 
-# Настройка подключения к Redis
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+# Настройка подключения к базе данных SQLite
+conn = sqlite3.connect('game_sessions.db')
+c = conn.cursor()
+
+# Создание таблицы, если она не существует
+c.execute('''
+CREATE TABLE IF NOT EXISTS sessions (
+    game_id TEXT PRIMARY KEY,
+    player_name TEXT
+)
+''')
+conn.commit()
 
 
 def add_session(game_id, player_name):
-    redis_client.hset(game_id, "player_name", player_name)
+    with conn:
+        c.execute("INSERT OR REPLACE INTO sessions (game_id, player_name) VALUES (?, ?)", (game_id, player_name))
 
 
 def get_sessions():
-    sessions = redis_client.keys()
-    return [session.decode('utf-8') for session in sessions]
+    c.execute("SELECT game_id FROM sessions")
+    sessions = c.fetchall()
+    return [session[0] for session in sessions]
 
 
 def remove_session(game_id):
-    redis_client.delete(game_id)
+    with conn:
+        c.execute("DELETE FROM sessions WHERE game_id = ?", (game_id,))
