@@ -80,7 +80,7 @@ def create_game(request: CreateGameRequest):
     """Создает новую игровую сессию и возвращает ID игры и имя первого игрока."""
     game_id = len(games)
     games.append(Game(player1_name=request.player1_name))
-    return {"message": "Game created successfully.", "game_id": game_id}
+    return {"message": "Game created successfully.", "game_id": game_id, "player": "player1"}
 
 
 @app.post("/join_game/")
@@ -92,7 +92,7 @@ def join_game(request: JoinGameRequest):
     if game.player2_name:
         raise HTTPException(status_code=400, detail="Game already has two players.")
     game.player2_name = request.player2_name
-    return {"message": "Player 2 joined successfully.", "game_id": request.game_id}
+    return {"message": "Player 2 joined successfully.", "game_id": request.game_id, "player": "player2"}
 
 
 @app.get("/get_games/")

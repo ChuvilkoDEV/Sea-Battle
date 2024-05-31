@@ -1,7 +1,6 @@
 import pygame
 import sys
 import requests
-import uuid
 from utils import draw_button
 from game import placement_phase
 
@@ -9,10 +8,6 @@ SERVER_URL = "http://127.0.0.1:8000"
 
 
 def main_menu(screen, game_rooms_menu, settings_menu):
-    """
-    Функция отображает главное меню игры.
-    В меню можно выбрать "Играть", "Настройки" или "Выйти".
-    """
     run = True
     while run:
         screen.fill((255, 255, 255))
@@ -41,10 +36,6 @@ def main_menu(screen, game_rooms_menu, settings_menu):
 
 
 def game_rooms_menu(screen):
-    """
-    Функция отображает меню комнат игры.
-    Пользователь может выбрать существующую комнату или создать новую.
-    """
     run = True
     while run:
         screen.fill((255, 255, 255))
@@ -78,59 +69,77 @@ def game_rooms_menu(screen):
                     run = False
                 for i, game_id in enumerate(games):
                     if pygame.Rect(screen.get_width() // 2 - 100, 100 + i * 70, 200, 50).collidepoint(event.pos):
-                        placement_phase(screen, game_id)
+                        player2_name = input_player_name(screen, "Введите имя игрока 2:")
+                        join_game(screen, game_id, player2_name)
 
         pygame.display.flip()
+    main_menu(screen, game_rooms_menu, None)
 
 
 def create_game(screen):
-    """
-    Функция позволяет создать новую игру, вводя имя игрока. ID игры генерируется автоматически.
-    """
-    run = True
-    player_name = ""
-    name_box = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 - 25, 200, 50)
+    player1_name = input_player_name(screen, "Введите имя игрока 1:")
+    response = requests.post(f"{SERVER_URL}/create_game/", json={"player1_name": player1_name})
+    data = response.json()
+    if response.status_code == 200:
+        game_id = data["game_id"]
+        player = data["player"]
+        placement_phase(screen, game_id, player)
+    else:
+        print(data["detail"])
 
-    while run:
-        screen.fill((255, 255, 255))
-        font = pygame.font.SysFont('Arial', 24)
-        label_font = pygame.font.SysFont('Arial', 20)
 
-        # Добавление подписи к полю ввода имени игрока
-        player_name_label = label_font.render("Имя Игрока:", True, (0, 0, 0))
-        screen.blit(player_name_label, (name_box.x, name_box.y - 25))
+def join_game(screen, game_id, player2_name):
+    response = requests.post(f"{SERVER_URL}/join_game/", json={"game_id": game_id, "player2_name": player2_name})
+    data = response.json()
+    if response.status_code == 200:
+        player = data["player"]
+        placement_phase(screen, game_id, player)
+    else:
+        print(data["detail"])
 
-        create_button = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 50, 200, 50)
-        draw_button(screen, "Создать", create_button, (169, 169, 169))
-        back_button = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() - 100, 200, 50)
-        draw_button(screen, "Назад", back_button, (169, 169, 169))
 
-        pygame.draw.rect(screen, (0, 0, 0), name_box, 2)
+def input_player_name(screen, prompt):
+    """Функция для ввода имени игрока."""
+    font = pygame.font.SysFont('Arial', 24)
+    input_box = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2, 200, 50)
+    color_inactive = pygame.Color('lightskyblue3')
+    color_active = pygame.Color('dodgerblue2')
+    color = color_inactive
+    active = False
+    text = ''
+    done = False
 
-        player_name_surface = font.render(player_name, True, (0, 0, 0))
-        screen.blit(player_name_surface, (name_box.x + 5, name_box.y + 5))
-
+    while not done:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                done = True
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if create_button.collidepoint(event.pos):
-                    response = requests.post(f"{SERVER_URL}/create_game/",
-                                             json={"player1_name": player_name})
-                    game_id = response.json()["game_id"]
-                    if response.status_code == 200:
-                        placement_phase(screen, game_id)
-                if back_button.collidepoint(event.pos):
-                    run = False
+                if input_box.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_inactive
             if event.type == pygame.KEYDOWN:
-                if name_box.collidepoint(pygame.mouse.get_pos()):
-                    if event.key == pygame.K_BACKSPACE:
-                        player_name = player_name[:-1]
+                if active:
+                    if event.key == pygame.K_RETURN:
+                        done = True
+                    elif event.key == pygame.K_BACKSPACE:
+                        text = text[:-1]
                     else:
-                        player_name += event.unicode
+                        text += event.unicode
+
+        screen.fill((255, 255, 255))
+        txt_surface = font.render(prompt, True, (0, 0, 0))
+        screen.blit(txt_surface,
+                    (screen.get_width() // 2 - txt_surface.get_width() // 2, screen.get_height() // 2 - 50))
+        txt_surface = font.render(text, True, color)
+        width = max(200, txt_surface.get_width() + 10)
+        input_box.w = width
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(screen, color, input_box, 2)
 
         pygame.display.flip()
-
+    return text
 
 
 def settings_menu(screen):

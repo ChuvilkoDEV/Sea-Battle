@@ -69,7 +69,7 @@ def is_valid_placement(ships, size, orientation, start_pos):
     return True
 
 
-def placement_phase(screen, game_id):
+def placement_phase(screen, game_id, player):
     run = True
     orientation = 0
     ships_to_place = [(4, "4-клеточный"), (3, "3-клеточный"), (3, "3-клеточный"),
@@ -112,8 +112,7 @@ def placement_phase(screen, game_id):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if finish_button.collidepoint(event.pos) and finish_button_active:
-                    response = send_ships_to_server(placed_ships, game_id, "player1")
-                    print(response)
+                    response = send_ships_to_server(placed_ships, game_id, player)
                     if response.get("message") == "Ship placed successfully.":
                         game_phase(screen, game_id)
                     else:
