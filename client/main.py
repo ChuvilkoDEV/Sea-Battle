@@ -2,7 +2,7 @@
 import pygame
 import sys
 from menu import main_menu, game_rooms_menu, settings_menu
-from game import game_loop
+
 
 # Инициализация Pygame
 pygame.init()

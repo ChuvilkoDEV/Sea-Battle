@@ -9,4 +9,5 @@ battleship/
 │
 └── server/
     ├── __init__.py
-    └── server.py
+    ├── server.py
+    └── database.py
