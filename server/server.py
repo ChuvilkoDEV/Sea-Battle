@@ -129,3 +129,10 @@ def shoot(pos: Tuple[int, int], game_id: int, player: str):
     board = games[game_id].computer_board if player == "player1" else games[game_id].player_board
     result = board.shoot(pos)
     return {"result": result}
+
+@app.get("/get_game_info/{game_id}")
+def get_game_info(game_id: int):
+    if game_id >= len(games):
+        raise HTTPException(status_code=404, detail="Game not found.")
+    game = games[game_id]
+    return {"player1_name": game.player1_name, "player2_name": game.player2_name}
