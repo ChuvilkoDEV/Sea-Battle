@@ -14,12 +14,10 @@ GRAY = (169, 169, 169)
 # URL сервера
 SERVER_URL = "http://127.0.0.1:8000"
 
-
 # Псевдо функция для отправки кораблей на сервер
 def send_ships_to_server(ships, game_id, player):
     response = requests.post(f"{SERVER_URL}/place_ship/", json={"ships": ships, "game_id": game_id, "player": player})
     return response.json()
-
 
 def draw_labels(screen):
     font = pygame.font.SysFont('Arial', 24)
@@ -28,13 +26,11 @@ def draw_labels(screen):
     screen.blit(player_label, (MARGIN + 4 * CELL_SIZE, MARGIN - 40))
     screen.blit(computer_label, (MARGIN + 4 * CELL_SIZE + screen.get_width() // 2 + OFFSET // 2, MARGIN - 40))
 
-
 def draw_grid(screen, offset_x=0):
     for row in range(ROWS):
         for col in range(COLS):
             pygame.draw.rect(screen, GRAY,
                              (MARGIN + col * CELL_SIZE + offset_x, MARGIN + row * CELL_SIZE, CELL_SIZE, CELL_SIZE), 1)
-
 
 def draw_ships(screen, ships, offset_x=0):
     for ship in ships:
@@ -44,7 +40,6 @@ def draw_ships(screen, ships, offset_x=0):
             pygame.draw.rect(screen, GRAY, (
             MARGIN + pos[1] * CELL_SIZE + offset_x, MARGIN + pos[0] * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
-
 def is_valid_placement(ships, size, orientation, start_pos):
     row, col = start_pos
     if orientation == 0 and col + size > COLS:
@@ -52,22 +47,14 @@ def is_valid_placement(ships, size, orientation, start_pos):
     if orientation == 1 and row + size > ROWS:
         return False
     for ship in ships:
-        for i in range(-1, ship["size"] + 1):
-            for j in range(-1, 2):
-                if orientation == 0:
-                    if (row + j, col + i) in [
-                        (ship["start_pos"][0] + k if ship["orientation"] == 1 else ship["start_pos"][0],
-                         ship["start_pos"][1] + k if ship["orientation"] == 0 else ship["start_pos"][1]) for k in
-                        range(ship["size"])]:
-                        return False
-                else:
-                    if (row + i, col + j) in [
-                        (ship["start_pos"][0] + k if ship["orientation"] == 1 else ship["start_pos"][0],
-                         ship["start_pos"][1] + k if ship["orientation"] == 0 else ship["start_pos"][1]) for k in
-                        range(ship["size"])]:
-                        return False
+        for i in range(ship["size"]):
+            pos = (ship["start_pos"][0] + i if ship["orientation"] == 1 else ship["start_pos"][0],
+                   ship["start_pos"][1] + i if ship["orientation"] == 0 else ship["start_pos"][1])
+            for j in range(size):
+                new_pos = (row + j if orientation == 1 else row, col + j if orientation == 0 else col)
+                if pos == new_pos:
+                    return False
     return True
-
 
 def draw_messages(screen, messages, font, message_box):
     pygame.draw.rect(screen, WHITE, message_box)
@@ -92,7 +79,6 @@ def draw_messages(screen, messages, font, message_box):
             message_surf = font.render(line, True, BLACK)
             screen.blit(message_surf, (message_box.x + 5, y_offset))
             y_offset += line_spacing
-
 
 def placement_phase(screen, game_id, player):
     run = True
@@ -159,7 +145,7 @@ def placement_phase(screen, game_id, player):
             if event.type == pygame.MOUSEBUTTONUP:
                 if dragging:
                     mouse_x, mouse_y = event.pos
-                    if MARGIN < mouse_x < MARGIN + COLS * CELL_SIZE and MARGIN < mouse_y < ROWS * CELL_SIZE:
+                    if MARGIN < mouse_x < MARGIN + COLS * CELL_SIZE and MARGIN < mouse_y < MARGIN + ROWS * CELL_SIZE:
                         col = (mouse_x - MARGIN) // CELL_SIZE
                         row = (mouse_y - MARGIN) // CELL_SIZE
                         if is_valid_placement(placed_ships, current_ship_size, orientation, (row, col)):
@@ -239,5 +225,4 @@ def game_phase(screen, game_id):
 
     pygame.quit()
     sys.exit()
-
 
