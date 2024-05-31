@@ -159,8 +159,23 @@ def get_game_info(game_id: int):
     if game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
     game = games[game_id]
+
+    last_shot = None
+    if game.current_turn == "player2" and game.player1_board.shots:
+        last_shot = game.player1_board.shots[-1]
+    elif game.current_turn == "player1" and game.player2_board.shots:
+        last_shot = game.player2_board.shots[-1]
+
+    result = None
+    if last_shot:
+        for ship in (game.player1_board.ships if game.current_turn == "player2" else game.player2_board.ships):
+            if last_shot in ship.positions:
+                result = "hit" if last_shot in ship.hits else "miss"
+                break
+
     return {
         "player1_name": game.player1_name,
         "player2_name": game.player2_name,
-        "current_turn": game.current_turn
+        "current_turn": game.current_turn,
+        "last_shot": (last_shot[0], last_shot[1], result) if last_shot else None
     }

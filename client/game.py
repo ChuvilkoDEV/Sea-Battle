@@ -38,7 +38,7 @@ def draw_grid(screen, shots=None, offset_x=0):
             pygame.draw.rect(screen, GRAY, cell_rect, 1)
             if (row, col) in shots:
                 if shots[(row, col)] == "hit":
-                    pygame.draw.rect(screen, (105, 105, 105), cell_rect)
+                    pygame.draw.rect(screen, (255, 0, 0), cell_rect)
                 elif shots[(row, col)] == "miss":
                     pygame.draw.line(screen, BLACK, cell_rect.topleft, cell_rect.bottomright, 2)
                     pygame.draw.line(screen, BLACK, cell_rect.topright, cell_rect.bottomleft, 2)
@@ -178,20 +178,29 @@ def placement_phase(screen, game_id, player):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if finish_button.collidepoint(event.pos) and finish_button_active:
-                    response = requests.get(f"{SERVER_URL}/get_game_info/{game_id}")
-                    game_info = response.json()
-                    if not game_info.get("player2_name"):
+                    try:
+                        response = requests.get(f"{SERVER_URL}/get_game_info/{game_id}")
+                        game_info = response.json()
+                    except requests.exceptions.JSONDecodeError:
+                        messages.append("Ошибка: Неверный ответ от сервера.")
+                        game_info = None
+
+                    if game_info and not game_info.get("player2_name"):
                         messages.append("Второй игрок ещё не подключился.")
                         print("Второй игрок ещё не подключился.")
                     else:
-                        response = send_ships_to_server(placed_ships, game_id, player)
-                        if response.get("message") == "Ship placed successfully.":
-                            game_phase(screen, placed_ships, game_id, player)
-                        else:
+                        try:
+                            response = send_ships_to_server(placed_ships, game_id, player)
+                        except requests.exceptions.JSONDecodeError:
                             messages.append("Ошибка отправки данных на сервер.")
                             print("Ошибка отправки данных на сервер.")
-                        run = False
-                if 10 < mouse_x < 10 + 4 * CELL_SIZE and 100 < mouse_y < 100 + len(ships_to_place) * 2 * CELL_SIZE:
+                        else:
+                            if response['message'] == "Ship placed successfully.":
+                                run = False
+                                game_phase(screen, placed_ships, game_id, player)
+                            else:
+                                messages.append("Ошибка: " + response.get("error", "Неизвестная ошибка"))
+                else:
                     ship_index = (mouse_y - 100) // (2 * CELL_SIZE)
                     if 0 <= ship_index < len(ships_to_place):
                         dragging = True
@@ -236,46 +245,73 @@ def game_phase(screen, placed_ships, game_id, player):
     message_box = pygame.Rect((screen.get_width() - 150) // 2, MARGIN, 150, 200)
     font = pygame.font.SysFont('Arial', 18)
 
-    shots = {}
-    print(requests.get(f"{SERVER_URL}/get_game_info/{game_id}"))
-    print(requests.get(f"{SERVER_URL}/get_game_info/{game_id}").json())
+    my_shots = {}  # Выстрелы по полю противника
+    enemy_shots = {}  # Выстрелы противника по вашему полю
 
     while run:
-        current_player = requests.get(f"{SERVER_URL}/get_game_info/{game_id}").json()['current_turn']
+        try:
+            response = requests.get(f"{SERVER_URL}/get_game_info/{game_id}")
+            game_info = response.json()
+        except requests.exceptions.JSONDecodeError:
+            messages.append("Ошибка: Неверный ответ от сервера.")
+            game_info = None
+
+        if not game_info:
+            continue
+
+        # Check if 'current_turn' exists in the response
+        if 'current_turn' not in game_info:
+            messages.append("Ошибка: Неверный формат данных от сервера.")
+            pygame.display.flip()
+            continue
+
+        current_player = game_info['current_turn']
+
         screen.fill(WHITE)
         draw_labels(screen)
-        draw_grid(screen, shots)
-        draw_grid(screen, shots, offset_x)
-        draw_messages(screen, messages, font, message_box)
+        draw_grid(screen, my_shots, offset_x)  # Выстрелы игрока на поле противника
+        draw_grid(screen, enemy_shots)  # Выстрелы противника на поле игрока
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-            if event.type == pygame.MOUSEBUTTONDOWN and current_player == player:
-                mouse_x, mouse_y = event.pos
-                if offset_x + MARGIN <= mouse_x < offset_x + MARGIN + COLS * CELL_SIZE and \
-                        MARGIN <= mouse_y < MARGIN + ROWS * CELL_SIZE:
-                    col = (mouse_x - offset_x - MARGIN) // CELL_SIZE
-                    row = (mouse_y - MARGIN) // CELL_SIZE
-                    response = requests.post(f"{SERVER_URL}/shoot/",
-                                             json={"game_id": game_id, "pos": (row, col), "player": current_player})
-                    result = response.json()
-                    if result.get("result") == "hit":
-                        shots[(row, col)] = "hit"
-                        messages.append(f"Попадание! Ходит {current_player}.")
-                    elif result.get("result") == "miss":
-                        shots[(row, col)] = "miss"
-                        messages.append(f"Мимо! Ходит другой игрок.")
-                        current_player = "player2" if current_player == "player1" else "player1"
-                    elif result.get("result") == "sunk":
-                        shots[(row, col)] = "hit"
-                        messages.append(f"Корабль потоплен! Ходит {current_player}.")
-                    elif result.get("result") == "already_shot":
-                        messages.append("Вы уже стреляли сюда. Ходит другой игрок.")
-                        current_player = "player2" if current_player == "player1" else "player1"
+        # Рисуем корабли игрока на его поле, но не на поле противника
+        draw_ships(screen, placed_ships)
+
+        draw_messages(screen, messages, font, message_box)
 
         if current_player != player:
             messages.append("Ожидание хода другого игрока.")
+            enemy_shot = game_info.get('last_shot')
+            if enemy_shot:
+                enemy_shots[(enemy_shot[0], enemy_shot[1])] = "hit" if enemy_shot[2] == "hit" else "miss"
+        else:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_x, mouse_y = event.pos
+                    if offset_x + MARGIN <= mouse_x < offset_x + MARGIN + COLS * CELL_SIZE and \
+                            MARGIN <= mouse_y < MARGIN + ROWS * CELL_SIZE:
+                        col = (mouse_x - offset_x - MARGIN) // CELL_SIZE
+                        row = (mouse_y - MARGIN) // CELL_SIZE
+                        try:
+                            response = requests.post(f"{SERVER_URL}/shoot/",
+                                                     json={"game_id": game_id, "pos": (row, col),
+                                                           "player": current_player})
+                            result = response.json()
+                        except requests.exceptions.JSONDecodeError:
+                            messages.append("Ошибка: Неверный ответ от сервера.")
+                            result = None
 
-        draw_ships(screen, placed_ships)
+                        if result:
+                            if result.get("result") == "hit":
+                                my_shots[(row, col)] = "hit"
+                                messages.append(f"Попадание! Ходит {current_player}.")
+                            elif result.get("result") == "miss":
+                                my_shots[(row, col)] = "miss"
+                                messages.append(f"Мимо! Ходит другой игрок.")
+                            elif result.get("result") == "sunk":
+                                my_shots[(row, col)] = "hit"
+                                messages.append(f"Корабль потоплен! Ходит {current_player}.")
+                            elif result.get("result") == "already_shot":
+                                messages.append("Вы уже стреляли сюда. Ходит другой игрок.")
+
         pygame.display.flip()
