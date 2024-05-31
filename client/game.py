@@ -1,14 +1,13 @@
 import pygame
 import sys
 import requests
-from random import randint
 from utils import draw_button
 
 # Константы и цвета
 ROWS, COLS = 10, 10
-CELL_SIZE = 40
+CELL_SIZE = 20
 MARGIN = 50
-OFFSET = 200
+OFFSET = 50
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (169, 169, 169)
@@ -16,69 +15,14 @@ GRAY = (169, 169, 169)
 # URL сервера
 SERVER_URL = "http://127.0.0.1:8000"
 
-
-def place_ship(size, orientation, start_pos, game_id, player):
-    """
-    Размещает корабль на сервере.
-
-    Аргументы:
-    size -- размер корабля
-    orientation -- ориентация корабля (0 для горизонтальной, 1 для вертикальной)
-    start_pos -- начальная позиция корабля (кортеж (строка, столбец))
-    game_id -- идентификатор игры
-    player -- игрок, который размещает корабль ("player" или "computer")
-
-    Возвращает:
-    JSON-ответ от сервера с результатом размещения.
-    """
-    ship = {
-        "size": size,
-        "orientation": orientation,
-        "positions": [(start_pos[0] + i if orientation == 1 else start_pos[0],
-                       start_pos[1] + i if orientation == 0 else start_pos[1]) for i in range(size)]
-    }
-    response = requests.post(f"{SERVER_URL}/place_ship/", json={"ship": ship, "game_id": game_id, "player": player})
-    return response.json()
-
-
-def shoot(pos, game_id, player):
-    """
-    Выполняет выстрел по указанной позиции на сервере.
-
-    Аргументы:
-    pos -- позиция выстрела (кортеж (строка, столбец))
-    game_id -- идентификатор игры
-    player -- игрок, который стреляет ("player" или "computer")
-
-    Возвращает:
-    JSON-ответ от сервера с результатом выстрела.
-    """
-    response = requests.post(f"{SERVER_URL}/shoot/", json={"pos": pos, "game_id": game_id, "player": player})
-    return response.json()
-
-
-def get_enemy_shot(game_id, player):
-    """
-    Получает информацию о выстреле противника с сервера.
-
-    Аргументы:
-    game_id -- идентификатор игры
-    player -- игрок, для которого запрашивается информация о выстреле противника
-
-    Возвращает:
-    JSON-ответ от сервера с информацией о выстреле противника.
-    """
-    response = requests.get(f"{SERVER_URL}/get_enemy_shot/", params={"game_id": game_id, "player": player})
+# Псевдо функция для отправки кораблей на сервер
+def send_ships_to_server(ships, game_id, player):
+    # В реальной ситуации здесь будет запрос на сервер
+    response = requests.post(f"{SERVER_URL}/place_ships/", json={"ships": ships, "game_id": game_id, "player": player})
     return response.json()
 
 
 def draw_labels(screen):
-    """
-    Отрисовывает метки на экране (названия игроков).
-
-    Аргументы:
-    screen -- объект Pygame Surface, на котором происходит отрисовка
-    """
     font = pygame.font.SysFont('Arial', 24)
     player_label = font.render('Игрок', True, BLACK)
     computer_label = font.render('Компьютер', True, BLACK)
@@ -87,37 +31,65 @@ def draw_labels(screen):
 
 
 def draw_grid(screen, offset_x=0):
-    """
-    Отрисовывает сетку на экране.
-
-    Аргументы:
-    screen -- объект Pygame Surface, на котором происходит отрисовка
-    offset_x -- горизонтальное смещение сетки
-    """
     for row in range(ROWS):
         for col in range(COLS):
             pygame.draw.rect(screen, GRAY,
                              (MARGIN + col * CELL_SIZE + offset_x, MARGIN + row * CELL_SIZE, CELL_SIZE, CELL_SIZE), 1)
 
 
-def placement_phase(screen, game_id):
-    """
-    Обрабатывает фазу размещения кораблей игроком.
+def draw_ships(screen, ships, offset_x=0):
+    for ship in ships:
+        for i in range(ship["size"]):
+            pos = (ship["start_pos"][0] + i if ship["orientation"] == 1 else ship["start_pos"][0],
+                   ship["start_pos"][1] + i if ship["orientation"] == 0 else ship["start_pos"][1])
+            pygame.draw.rect(screen, GRAY,
+                             (MARGIN + pos[1] * CELL_SIZE + offset_x, MARGIN + pos[0] * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
-    Аргументы:
-    screen -- объект Pygame Surface, на котором происходит отрисовка
-    game_id -- идентификатор игры
-    """
+
+def is_valid_placement(ships, size, orientation, start_pos):
+    row, col = start_pos
+
+    # Проверка на выход за границы поля
+    if orientation == 0 and col + size > COLS:
+        return False
+    if orientation == 1 and row + size > ROWS:
+        return False
+
+    # Проверка на соседство с другими кораблями
+    for ship in ships:
+        for i in range(-1, ship["size"] + 1):
+            for j in range(-1, 2):
+                if orientation == 0:
+                    if (row + j, col + i) in [(ship["start_pos"][0] + k if ship["orientation"] == 1 else ship["start_pos"][0],
+                                               ship["start_pos"][1] + k if ship["orientation"] == 0 else ship["start_pos"][1]) for k in range(ship["size"])]:
+                        return False
+                else:
+                    if (row + i, col + j) in [(ship["start_pos"][0] + k if ship["orientation"] == 1 else ship["start_pos"][0],
+                                               ship["start_pos"][1] + k if ship["orientation"] == 0 else ship["start_pos"][1]) for k in range(ship["size"])]:
+                        return False
+    return True
+
+
+def placement_phase(screen, game_id):
     run = True
     orientation = 0
-    current_ship_size = 4
+    ships_to_place = [(4, "4-клеточный"), (3, "3-клеточный"), (2, "2-клеточный"), (1, "1-клеточный")]
+    current_ship_index = 0
+    current_ship_size = ships_to_place[current_ship_index][0]
+    dragging = False
+    ship_pos = (0, 0)
     placed_ships = []
 
-    while run and current_ship_size > 0:
+    while run:
         screen.fill(WHITE)
         draw_labels(screen)
         draw_grid(screen)
         draw_grid(screen, screen.get_width() // 2 + OFFSET)
+
+        for i, ship in enumerate(ships_to_place):
+            for j in range(ship[0]):
+                pygame.draw.rect(screen, GRAY,
+                                 (10 + j * CELL_SIZE, 100 + i * CELL_SIZE * 2, CELL_SIZE, CELL_SIZE))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -127,34 +99,54 @@ def placement_phase(screen, game_id):
                     orientation = (orientation + 1) % 2
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
-                if mouse_x > MARGIN and mouse_x < MARGIN + COLS * CELL_SIZE and mouse_y > MARGIN and mouse_y < MARGIN + ROWS * CELL_SIZE:
-                    col = (mouse_x - MARGIN) // CELL_SIZE
-                    row = (mouse_y - MARGIN) // CELL_SIZE
-                    response = place_ship(current_ship_size, orientation, (row, col), game_id, "player")
-                    if response.get("success"):
-                        placed_ships.append((current_ship_size, orientation, (row, col)))
-                        current_ship_size -= 1
+                if 10 < mouse_x < 10 + 4 * CELL_SIZE and 100 < mouse_y < 100 + len(ships_to_place) * 2 * CELL_SIZE:
+                    ship_index = (mouse_y - 100) // (2 * CELL_SIZE)
+                    if 0 <= ship_index < len(ships_to_place):
+                        dragging = True
+                        ship_pos = (mouse_x, mouse_y)
+                        current_ship_index = ship_index
+                        current_ship_size = ships_to_place[current_ship_index][0]
+            if event.type == pygame.MOUSEBUTTONUP:
+                if dragging:
+                    mouse_x, mouse_y = event.pos
+                    if MARGIN < mouse_x < MARGIN + COLS * CELL_SIZE and MARGIN < mouse_y < MARGIN + ROWS * CELL_SIZE:
+                        col = (mouse_x - MARGIN) // CELL_SIZE
+                        row = (mouse_y - MARGIN) // CELL_SIZE
+                        if is_valid_placement(placed_ships, current_ship_size, orientation, (row, col)):
+                            placed_ships.append({"size": current_ship_size, "orientation": orientation, "start_pos": (row, col)})
+                            del ships_to_place[current_ship_index]
+                            dragging = False
+                            if not ships_to_place:
+                                run = False
+                        else:
+                            print("Неправильное размещение корабля. Попробуйте другое место.")
+                    dragging = False
+            if event.type == pygame.MOUSEMOTION:
+                if dragging:
+                    ship_pos = event.pos
 
-        for ship in placed_ships:
-            for i in range(ship[0]):
-                pos = (ship[2][0] + i if ship[1] == 1 else ship[2][0],
-                       ship[2][1] + i if ship[1] == 0 else ship[2][1])
-                pygame.draw.rect(screen, GRAY,
-                                 (MARGIN + pos[1] * CELL_SIZE, MARGIN + pos[0] * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        if dragging:
+            base_row = (ship_pos[1] - MARGIN) // CELL_SIZE
+            base_col = (ship_pos[0] - MARGIN) // CELL_SIZE
+            for i in range(current_ship_size):
+                pos_x = (base_col + i if orientation == 0 else base_col) * CELL_SIZE + MARGIN
+                pos_y = (base_row + i if orientation == 1 else base_row) * CELL_SIZE + MARGIN
+                pygame.draw.rect(screen, GRAY, (pos_x, pos_y, CELL_SIZE, CELL_SIZE))
 
+        draw_ships(screen, placed_ships)
         pygame.display.flip()
 
-    game_phase(screen, game_id)
+    # Отправка всех кораблей на сервер
+    response = send_ships_to_server(placed_ships, game_id, "player")
+    if response.get("success"):
+        game_phase(screen, game_id)
+    else:
+        print("Ошибка отправки данных на сервер.")
+        pygame.quit()
+        sys.exit()
 
 
 def game_phase(screen, game_id):
-    """
-    Обрабатывает фазу игры, включая ходы игрока и компьютера.
-
-    Аргументы:
-    screen -- объект Pygame Surface, на котором происходит отрисовка
-    game_id -- идентификатор игры
-    """
     run = True
     clock = pygame.time.Clock()
     player_turn = True
@@ -171,7 +163,7 @@ def game_phase(screen, game_id):
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN and player_turn:
                 mouse_x, mouse_y = event.pos
-                if mouse_x > MARGIN + screen.get_width() // 2 + OFFSET and mouse_y > MARGIN and mouse_x < MARGIN + screen.get_width() // 2 + OFFSET + COLS * CELL_SIZE and mouse_y < MARGIN + ROWS * CELL_SIZE:
+                if MARGIN + screen.get_width() // 2 + OFFSET < mouse_x < MARGIN + screen.get_width() // 2 + OFFSET + COLS * CELL_SIZE and MARGIN < mouse_y < MARGIN + ROWS * CELL_SIZE:
                     col = (mouse_x - MARGIN - screen.get_width() // 2 - OFFSET) // CELL_SIZE
                     row = (mouse_y - MARGIN) // CELL_SIZE
                     result = shoot((row, col), game_id, "player")
