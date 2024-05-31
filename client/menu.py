@@ -52,10 +52,15 @@ def game_rooms_menu(screen):
 
         font = pygame.font.SysFont('Arial', 24)
         y_offset = 100
-        for game_id in games:
-            game_button = pygame.Rect(screen.get_width() // 2 - 100, y_offset, 200, 50)
-            draw_button(screen, game_id, game_button, (169, 169, 169))
-            y_offset += 70
+        if games:
+            for game_id in games:
+                game_button = pygame.Rect(screen.get_width() // 2 - 100, y_offset, 200, 50)
+                draw_button(screen, game_id, game_button, (169, 169, 169))
+                y_offset += 70
+        else:
+            no_games_label = font.render('Нет доступных комнат', True, (0, 0, 0))
+            no_games_rect = no_games_label.get_rect(center=(screen.get_width() // 2, y_offset))
+            screen.blit(no_games_label, no_games_rect)
 
         create_button = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() - 100, 200, 50)
         draw_button(screen, "Создать комнату", create_button, (169, 169, 169))
