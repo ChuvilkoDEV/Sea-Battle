@@ -1,8 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Tuple, Dict
-import uuid
-from .database import add_session, get_sessions, get_session, update_player2, update_ships, update_shots, remove_session
 
 app = FastAPI()
 
@@ -59,7 +57,7 @@ class Game(BaseModel):
     player2_name: str = ""
 
 
-games: Dict[str, Game] = {}
+games: List[Game] = []
 
 
 class CreateGameRequest(BaseModel):
@@ -67,61 +65,67 @@ class CreateGameRequest(BaseModel):
 
 
 class JoinGameRequest(BaseModel):
-    game_id: str
+    game_id: int
     player2_name: str
+
+
+class PlaceShipsRequest(BaseModel):
+    ships: List[Dict]
+    game_id: int
+    player: str
 
 
 @app.post("/create_game/")
 def create_game(request: CreateGameRequest):
     """Создает новую игровую сессию и возвращает ID игры и имя первого игрока."""
-    game_id = str(uuid.uuid4())
-    games[game_id] = Game(player1_name=request.player1_name)
-    add_session(game_id, request.player1_name)
+    game_id = len(games)
+    games.append(Game(player1_name=request.player1_name))
     return {"message": "Game created successfully.", "game_id": game_id}
 
 
 @app.post("/join_game/")
 def join_game(request: JoinGameRequest):
     """Позволяет второму игроку подключиться к существующей игре."""
-    if request.game_id not in games:
+    if request.game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
     game = games[request.game_id]
     if game.player2_name:
         raise HTTPException(status_code=400, detail="Game already has two players.")
     game.player2_name = request.player2_name
-    update_player2(request.game_id, request.player2_name)
     return {"message": "Player 2 joined successfully.", "game_id": request.game_id}
 
 
 @app.get("/get_games/")
 def get_games():
     """Получает список активных игровых сессий."""
-    sessions = get_sessions()
-    return {"games": sessions}
+    return {"games": list(range(len(games)))}
 
 
 @app.post("/place_ship/")
-def place_ship(ship: Ship, game_id: str, player: str):
-    """Размещает корабль на поле указанного игрока."""
-    if game_id not in games:
+def place_ship(request: PlaceShipsRequest):
+    """Размещает корабли на поле указанного игрока."""
+    if request.game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
-    board = games[game_id].player_board if player == "player1" else games[game_id].computer_board
-    if board.can_place(ship):
-        board.place_ship(ship)
-        ships_data = [ship.dict() for ship in board.ships]
-        update_ships(game_id, player, str(ships_data))
-        return {"message": "Ship placed successfully."}
-    else:
-        raise HTTPException(status_code=400, detail="Cannot place ship here.")
+    board = games[request.game_id].player_board if request.player == "player1" else games[
+        request.game_id].computer_board
+    for ship_data in request.ships:
+        ship = Ship(size=ship_data["size"], orientation=ship_data["orientation"],
+                    positions=[
+                        (ship_data["start_pos"][0] + i if ship_data["orientation"] == 1 else ship_data["start_pos"][0],
+                         ship_data["start_pos"][1] + i if ship_data["orientation"] == 0 else ship_data["start_pos"][1])
+                        for i in range(ship_data["size"])])
+        if board.can_place(ship):
+            board.place_ship(ship)
+        else:
+            raise HTTPException(status_code=400, detail="Cannot place ship here.")
+    return {"message": "Ship placed successfully."}
 
 
 @app.post("/shoot/")
-def shoot(pos: Tuple[int, int], game_id: str, player: str):
+def shoot(pos: Tuple[int, int], game_id: int, player: str):
     """Выполняет выстрел по указанной позиции и возвращает результат."""
-    if game_id not in games:
+    if game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
     board = games[game_id].computer_board if player == "player1" else games[game_id].player_board
     result = board.shoot(pos)
-    shots_data = board.shots
-    update_shots(game_id, player, str(shots_data))
     return {"result": result}

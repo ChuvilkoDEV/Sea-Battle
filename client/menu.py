@@ -115,10 +115,9 @@ def create_game(screen):
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if create_button.collidepoint(event.pos):
-                    game_id = str(uuid.uuid4())  # Генерация уникального ID для игры
-                    # Ensure the payload matches the expected format
                     response = requests.post(f"{SERVER_URL}/create_game/",
                                              json={"player1_name": player_name})
+                    game_id = response.json()["game_id"]
                     if response.status_code == 200:
                         placement_phase(screen, game_id)
                 if back_button.collidepoint(event.pos):
