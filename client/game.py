@@ -137,6 +137,7 @@ def placement_phase(screen, game_id, player):
     ships_to_place = [(4, "4-клеточный"), (3, "3-клеточный"), (3, "3-клеточный"),
                       (2, "2-клеточный"), (2, "2-клеточный"), (2, "2-клеточный"),
                       (1, "1-клеточный"), (1, "1-клеточный"), (1, "1-клеточный"), (1, "1-клеточный")]
+    ships_to_place.sort(reverse=True, key=lambda x: x[0])  # Сортировка кораблей по убыванию размера
     current_ship_index = 0
     current_ship_size = ships_to_place[current_ship_index][0]
     dragging = False
