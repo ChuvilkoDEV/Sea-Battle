@@ -5,8 +5,8 @@ import requests
 # Константы и цвета
 ROWS, COLS = 10, 10
 CELL_SIZE = 20
-MARGIN = 100
-OFFSET = 50
+MARGIN = 150
+OFFSET = 0
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (169, 169, 169)
@@ -69,6 +69,31 @@ def is_valid_placement(ships, size, orientation, start_pos):
     return True
 
 
+def draw_messages(screen, messages, font, message_box):
+    pygame.draw.rect(screen, WHITE, message_box)
+    pygame.draw.rect(screen, BLACK, message_box, 1)  # Добавим рамку для области сообщений
+
+    y_offset = message_box.y + 10  # Начинаем с верхней части
+    line_spacing = 30
+
+    for message in messages[-5:]:  # Отображаем последние 5 сообщений
+        words = message.split(' ')
+        lines = []
+        line = ""
+        for word in words:
+            if font.size(line + word)[0] < message_box.width - 10:
+                line += word + " "
+            else:
+                lines.append(line)
+                line = word + " "
+        lines.append(line)
+
+        for line in lines:
+            message_surf = font.render(line, True, BLACK)
+            screen.blit(message_surf, (message_box.x + 5, y_offset))
+            y_offset += line_spacing
+
+
 def placement_phase(screen, game_id, player):
     run = True
     orientation = 0
@@ -80,15 +105,20 @@ def placement_phase(screen, game_id, player):
     dragging = False
     ship_pos = (0, 0)
     placed_ships = []
+    messages = ["Разместите корабли."]
 
     finish_button = pygame.Rect(screen.get_width() - 200, screen.get_height() - 50, 150, 40)
     finish_button_active = False
+
+    message_box = pygame.Rect((screen.get_width() - 150) // 2, MARGIN, 150, 200)
+    font = pygame.font.SysFont('Arial', 18)
 
     while run:
         screen.fill(WHITE)
         draw_labels(screen)
         draw_grid(screen)
         draw_grid(screen, screen.get_width() // 2 + OFFSET)
+        draw_messages(screen, messages, font, message_box)
 
         for i, (size, label) in enumerate(set(ships_to_place)):
             count = ships_to_place.count((size, label))
@@ -116,6 +146,7 @@ def placement_phase(screen, game_id, player):
                     if response.get("message") == "Ship placed successfully.":
                         game_phase(screen, game_id)
                     else:
+                        messages.append("Ошибка отправки данных на сервер.")
                         print("Ошибка отправки данных на сервер.")
                     run = False
                 if 10 < mouse_x < 10 + 4 * CELL_SIZE and 100 < mouse_y < 100 + len(ships_to_place) * 2 * CELL_SIZE:
@@ -128,17 +159,22 @@ def placement_phase(screen, game_id, player):
             if event.type == pygame.MOUSEBUTTONUP:
                 if dragging:
                     mouse_x, mouse_y = event.pos
-                    if MARGIN < mouse_x < MARGIN + COLS * CELL_SIZE and MARGIN < mouse_y < MARGIN + ROWS * CELL_SIZE:
+                    if MARGIN < mouse_x < MARGIN + COLS * CELL_SIZE and MARGIN < mouse_y < ROWS * CELL_SIZE:
                         col = (mouse_x - MARGIN) // CELL_SIZE
                         row = (mouse_y - MARGIN) // CELL_SIZE
                         if is_valid_placement(placed_ships, current_ship_size, orientation, (row, col)):
                             placed_ships.append(
                                 {"size": current_ship_size, "orientation": orientation, "start_pos": (row, col)})
                             ships_to_place.pop(current_ship_index)
+                            messages.append(f"Корабль размером {current_ship_size} клеток размещен.")
+                            print(f"Корабль размером {current_ship_size} клеток размещен.")
                             dragging = False
                             if not ships_to_place:
                                 finish_button_active = True
+                                messages.append("Все корабли размещены. Нажмите 'Закончить'.")
+                                print("Все корабли размещены. Нажмите 'Закончить'.")
                         else:
+                            messages.append("Неправильное размещение корабля. Попробуйте другое место.")
                             print("Неправильное размещение корабля. Попробуйте другое место.")
                     dragging = False
             if event.type == pygame.MOUSEMOTION:
@@ -161,6 +197,10 @@ def game_phase(screen, game_id):
     run = True
     clock = pygame.time.Clock()
     player_turn = True
+    messages = ["Игра началась!"]
+
+    message_box = pygame.Rect((screen.get_width() - 150) // 2, MARGIN, 150, 200)
+    font = pygame.font.SysFont('Arial', 18)
 
     while run:
         clock.tick(60)
@@ -168,6 +208,7 @@ def game_phase(screen, game_id):
         draw_labels(screen)
         draw_grid(screen)
         draw_grid(screen, screen.get_width() // 2 + OFFSET)
+        draw_messages(screen, messages, font, message_box)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -181,16 +222,22 @@ def game_phase(screen, game_id):
                                              json={"pos": (row, col), "game_id": game_id, "player": "player1"})
                     result = response.json().get("result")
                     if result == "hit":
+                        messages.append("Попадание!")
                         print("Попадание!")
                     elif result == "miss":
+                        messages.append("Мимо!")
                         print("Мимо!")
                         player_turn = False
                     elif result == "sunk":
+                        messages.append("Корабль потоплен!")
                         print("Корабль потоплен!")
                     elif result == "already_shot":
+                        messages.append("Сюда уже стреляли!")
                         print("Сюда уже стреляли!")
 
         pygame.display.flip()
 
     pygame.quit()
     sys.exit()
+
+
