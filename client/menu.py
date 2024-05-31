@@ -1,6 +1,7 @@
 import pygame
 import sys
 import requests
+import uuid
 from utils import draw_button
 from game import placement_phase
 
@@ -84,28 +85,29 @@ def game_rooms_menu(screen):
 
 def create_game(screen):
     """
-    Функция позволяет создать новую игру, вводя ID игры и имя игрока.
+    Функция позволяет создать новую игру, вводя имя игрока. ID игры генерируется автоматически.
     """
     run = True
-    game_id = ""
     player_name = ""
-    input_box = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 - 25, 200, 50)
-    name_box = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 - 100, 200, 50)
+    name_box = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 - 25, 200, 50)
 
     while run:
         screen.fill((255, 255, 255))
         font = pygame.font.SysFont('Arial', 24)
+        label_font = pygame.font.SysFont('Arial', 20)
+
+        # Добавление подписи к полю ввода имени игрока
+        player_name_label = label_font.render("Имя Игрока:", True, (0, 0, 0))
+        screen.blit(player_name_label, (name_box.x, name_box.y - 25))
+
         create_button = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() // 2 + 50, 200, 50)
         draw_button(screen, "Создать", create_button, (169, 169, 169))
         back_button = pygame.Rect(screen.get_width() // 2 - 100, screen.get_height() - 100, 200, 50)
         draw_button(screen, "Назад", back_button, (169, 169, 169))
 
-        pygame.draw.rect(screen, (0, 0, 0), input_box, 2)
         pygame.draw.rect(screen, (0, 0, 0), name_box, 2)
 
-        game_id_surface = font.render(game_id, True, (0, 0, 0))
         player_name_surface = font.render(player_name, True, (0, 0, 0))
-        screen.blit(game_id_surface, (input_box.x + 5, input_box.y + 5))
         screen.blit(player_name_surface, (name_box.x + 5, name_box.y + 5))
 
         for event in pygame.event.get():
@@ -113,25 +115,23 @@ def create_game(screen):
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if create_button.collidepoint(event.pos):
+                    game_id = str(uuid.uuid4())  # Генерация уникального ID для игры
+                    # Ensure the payload matches the expected format
                     response = requests.post(f"{SERVER_URL}/create_game/",
-                                             json={"game_id": game_id, "player_name": player_name})
+                                             json={"player1_name": player_name})
                     if response.status_code == 200:
                         placement_phase(screen, game_id)
                 if back_button.collidepoint(event.pos):
                     run = False
             if event.type == pygame.KEYDOWN:
-                if input_box.collidepoint(pygame.mouse.get_pos()):
-                    if event.key == pygame.K_BACKSPACE:
-                        game_id = game_id[:-1]
-                    else:
-                        game_id += event.unicode
-                elif name_box.collidepoint(pygame.mouse.get_pos()):
+                if name_box.collidepoint(pygame.mouse.get_pos()):
                     if event.key == pygame.K_BACKSPACE:
                         player_name = player_name[:-1]
                     else:
                         player_name += event.unicode
 
         pygame.display.flip()
+
 
 
 def settings_menu(screen):

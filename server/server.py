@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Tuple, Dict
+import uuid
 from .database import add_session, get_sessions, get_session, update_player2, update_ships, update_shots, remove_session
 
 app = FastAPI()
@@ -62,7 +63,6 @@ games: Dict[str, Game] = {}
 
 
 class CreateGameRequest(BaseModel):
-    game_id: str
     player1_name: str
 
 
@@ -73,12 +73,11 @@ class JoinGameRequest(BaseModel):
 
 @app.post("/create_game/")
 def create_game(request: CreateGameRequest):
-    """Создает новую игровую сессию с указанным ID игры и именем первого игрока."""
-    if request.game_id in games:
-        raise HTTPException(status_code=400, detail="Game with this ID already exists.")
-    games[request.game_id] = Game(player1_name=request.player1_name)
-    add_session(request.game_id, request.player1_name)
-    return {"message": "Game created successfully.", "game_id": request.game_id}
+    """Создает новую игровую сессию и возвращает ID игры и имя первого игрока."""
+    game_id = str(uuid.uuid4())
+    games[game_id] = Game(player1_name=request.player1_name)
+    add_session(game_id, request.player1_name)
+    return {"message": "Game created successfully.", "game_id": game_id}
 
 
 @app.post("/join_game/")
