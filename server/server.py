@@ -146,7 +146,11 @@ def shoot(request: ShootRequest):
         raise HTTPException(status_code=400, detail="Not your turn.")
     board = game.player2_board if request.player == "player1" else game.player1_board
     result = board.shoot(request.pos)
-    game.switch_turn()  # Меняем текущего игрока после выстрела
+
+    # Переключение хода только при промахе
+    if result == "miss":
+        game.switch_turn()
+
     return {"result": result}
 
 

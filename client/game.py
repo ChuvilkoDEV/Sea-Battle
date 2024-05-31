@@ -153,8 +153,8 @@ def placement_phase(screen, game_id, player):
     while run:
         screen.fill(WHITE)
         draw_labels(screen)
-        draw_grid(screen)  # Передаем только screen, остальные параметры по умолчанию
-        draw_grid(screen, offset_x=screen.get_width() // 2 + OFFSET)  # Передаем offset_x
+        draw_grid(screen)
+        draw_grid(screen, offset_x=screen.get_width() // 2 + OFFSET)
 
         for i, (size, label) in enumerate(set(ships_to_place)):
             count = ships_to_place.count((size, label))
@@ -186,7 +186,7 @@ def placement_phase(screen, game_id, player):
                     else:
                         response = send_ships_to_server(placed_ships, game_id, player)
                         if response.get("message") == "Ship placed successfully.":
-                            game_phase(screen, placed_ships, game_id)
+                            game_phase(screen, placed_ships, game_id, player)
                         else:
                             messages.append("Ошибка отправки данных на сервер.")
                             print("Ошибка отправки данных на сервер.")
@@ -218,13 +218,14 @@ def placement_phase(screen, game_id, player):
                         messages.append("Некорректное размещение.")
                     dragging = False
             if event.type == pygame.MOUSEMOTION and dragging:
-                ship_pos = event.pos
+                ship_pos = (event.pos[1] - MARGIN) // CELL_SIZE, (event.pos[0] - MARGIN) // CELL_SIZE
 
         if dragging:
-            draw_ships(screen, [{"size": current_ship_size, "orientation": orientation, "start_pos": (0, 0)}])
-            draw_ships(screen, [{"size": current_ship_size, "orientation": orientation, "start_pos": ship_pos}])
+            draw_ships(screen, [
+                {"size": current_ship_size, "orientation": orientation, "start_pos": (ship_pos[0], ship_pos[1])}])
 
         draw_ships(screen, placed_ships)
+        draw_messages(screen, messages, font, message_box)
         pygame.display.flip()
 
 
@@ -235,10 +236,12 @@ def game_phase(screen, placed_ships, game_id, player):
     message_box = pygame.Rect((screen.get_width() - 150) // 2, MARGIN, 150, 200)
     font = pygame.font.SysFont('Arial', 18)
 
-    current_player = requests.get(f"{SERVER_URL}/shoot/{game_id}").json()['current_turn']
-    shots = {}  # Словарь для хранения результатов выстрелов
+    shots = {}
+    print(requests.get(f"{SERVER_URL}/get_game_info/{game_id}"))
+    print(requests.get(f"{SERVER_URL}/get_game_info/{game_id}").json())
 
     while run:
+        current_player = requests.get(f"{SERVER_URL}/get_game_info/{game_id}").json()['current_turn']
         screen.fill(WHITE)
         draw_labels(screen)
         draw_grid(screen, shots)
@@ -248,7 +251,7 @@ def game_phase(screen, placed_ships, game_id, player):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN and current_player == player:
                 mouse_x, mouse_y = event.pos
                 if offset_x + MARGIN <= mouse_x < offset_x + MARGIN + COLS * CELL_SIZE and \
                         MARGIN <= mouse_y < MARGIN + ROWS * CELL_SIZE:
@@ -270,6 +273,9 @@ def game_phase(screen, placed_ships, game_id, player):
                     elif result.get("result") == "already_shot":
                         messages.append("Вы уже стреляли сюда. Ходит другой игрок.")
                         current_player = "player2" if current_player == "player1" else "player1"
+
+        if current_player != player:
+            messages.append("Ожидание хода другого игрока.")
 
         draw_ships(screen, placed_ships)
         pygame.display.flip()
