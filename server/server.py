@@ -51,10 +51,15 @@ class Board(BaseModel):
 
 
 class Game(BaseModel):
-    player_board: Board = Board()
-    computer_board: Board = Board()
+    player1_board: Board = Board()
+    player2_board: Board = Board()
     player1_name: str = ""
     player2_name: str = ""
+    current_turn: str = "player1"  # "player1" или "player2"
+
+    def switch_turn(self):
+        """Меняет текущего игрока."""
+        self.current_turn = "player1" if self.current_turn == "player2" else "player2"
 
 
 games: List[Game] = []
@@ -106,14 +111,18 @@ def place_ship(request: PlaceShipsRequest):
     """Размещает корабли на поле указанного игрока."""
     if request.game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
-    board = games[request.game_id].player_board if request.player == "player1" else games[
-        request.game_id].computer_board
+    game = games[request.game_id]
+    board = game.player1_board if request.player == "player1" else game.player2_board
     for ship_data in request.ships:
-        ship = Ship(size=ship_data["size"], orientation=ship_data["orientation"],
-                    positions=[
-                        (ship_data["start_pos"][0] + i if ship_data["orientation"] == 1 else ship_data["start_pos"][0],
-                         ship_data["start_pos"][1] + i if ship_data["orientation"] == 0 else ship_data["start_pos"][1])
-                        for i in range(ship_data["size"])])
+        ship = Ship(
+            size=ship_data["size"],
+            orientation=ship_data["orientation"],
+            positions=[
+                (ship_data["start_pos"][0] + i if ship_data["orientation"] == 1 else ship_data["start_pos"][0],
+                 ship_data["start_pos"][1] + i if ship_data["orientation"] == 0 else ship_data["start_pos"][1])
+                for i in range(ship_data["size"])
+            ]
+        )
         if board.can_place(ship):
             board.place_ship(ship)
         else:
@@ -121,18 +130,33 @@ def place_ship(request: PlaceShipsRequest):
     return {"message": "Ship placed successfully."}
 
 
+class ShootRequest(BaseModel):
+    game_id: int
+    pos: Tuple[int, int]
+    player: str
+
+
 @app.post("/shoot/")
-def shoot(pos: Tuple[int, int], game_id: int, player: str):
+def shoot(request: ShootRequest):
     """Выполняет выстрел по указанной позиции и возвращает результат."""
-    if game_id >= len(games):
+    if request.game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
-    board = games[game_id].computer_board if player == "player1" else games[game_id].player_board
-    result = board.shoot(pos)
+    game = games[request.game_id]
+    if game.current_turn != request.player:
+        raise HTTPException(status_code=400, detail="Not your turn.")
+    board = game.player2_board if request.player == "player1" else game.player1_board
+    result = board.shoot(request.pos)
+    game.switch_turn()  # Меняем текущего игрока после выстрела
     return {"result": result}
+
 
 @app.get("/get_game_info/{game_id}")
 def get_game_info(game_id: int):
     if game_id >= len(games):
         raise HTTPException(status_code=404, detail="Game not found.")
     game = games[game_id]
-    return {"player1_name": game.player1_name, "player2_name": game.player2_name}
+    return {
+        "player1_name": game.player1_name,
+        "player2_name": game.player2_name,
+        "current_turn": game.current_turn
+    }
